@@ -21,33 +21,42 @@ Bu proje; **Next.js 14+ (App Router)**, **PostgreSQL (Docker)**, **Prisma ORM**,
 
 ## 📸 Ekran Görüntüleri (Screenshots)
 
-### 1. Ana Sayfa (Homepage)
+### 🛍️ Müşteri Arayüzü (Storefront)
+
+#### 1. Ana Sayfa (Homepage)
 ![Ana Sayfa](public/screenshots/anasayfa.png)
 
 ---
 
-### 2. Kategoriler (Categories)
+#### 2. Ürün Kataloğu & Kategoriler (Categories)
 ![Kategoriler](public/screenshots/kategoriler.png)
 
 ---
 
-### 3. Ürün Sayfası (Product Page)
-![Ürün Detay](public/screenshots/urun.png)
-
----
-
-### 4. Değerlendirmeler (Reviews)
+#### 3. Değerlendirmeler & Yorumlar (Reviews)
 ![Değerlendirmeler](public/screenshots/degerlendirmeler_kismi.png)
 
 ---
 
-### 5. Güvenli Giriş (Login)
-![Giriş](public/screenshots/login.png)
+### ⚙️ Yönetici Paneli (Admin Dashboard)
+
+#### 4. Analiz & Performans Grafikleri (Stats Dashboard)
+![Admin Dashboard](public/screenshots/admin_dashboard.png)
 
 ---
 
-### 6. Ürün Yönetimi / Detay (Admin Panel)
-![Ürün Yönetimi](public/screenshots/ürün_kismi.png)
+#### 5. Ürün Listesi & Stok Yönetimi (Product Inventory)
+![Ürün Yönetimi](public/screenshots/urun_yonetimi.png)
+
+---
+
+#### 6. Yeni Ürün & Varyant Ekleme (Create Product)
+![Yeni Ürün Ekleme](public/screenshots/admin_urunekleme.png)
+
+---
+
+#### 7. İndirim Kuponu Yönetimi (Coupon Manager)
+![Kupon Yönetimi](public/screenshots/admin_kupongosterimi.png)
 
 ---
 
