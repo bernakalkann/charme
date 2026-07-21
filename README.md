@@ -21,13 +21,17 @@ Bu proje; **Next.js 14+ (App Router)**, **PostgreSQL (Docker)**, **Prisma ORM**,
 
 ## 📸 Ekran Görüntüleri (Screenshots)
 
-| Ana Sayfa (Homepage) | Ürün Detay (Product Detail) |
+| Ana Sayfa (Homepage) | Kategoriler (Categories) |
 | --- | --- |
-| ![Ana Sayfa](public/screenshots/homepage.png) | ![Ürün Detay](public/screenshots/product.png) |
+| ![Ana Sayfa](public/screenshots/anasayfa.png) | ![Kategoriler](public/screenshots/kategoriler.png) |
 
-| Ürün Kataloğu & Filtreler | Güvenli Giriş |
+| Ürün Sayfası (Product Page) | Değerlendirmeler (Reviews) |
 | --- | --- |
-| ![Katalog](public/screenshots/category.png) | ![Giriş](public/screenshots/login.png) |
+| ![Ürün Detay](public/screenshots/urun.png) | ![Değerlendirmeler](public/screenshots/degerlendirmeler_kismi.png) |
+
+| Güvenli Giriş (Login) | Ürün Yönetimi / Detay |
+| --- | --- |
+| ![Giriş](public/screenshots/login.png) | ![Ürün Yönetimi](public/screenshots/ürün_kismi.png) |
 
 ---
 
