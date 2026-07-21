@@ -1,0 +1,211 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses     Address[]
+  orders        Order[]
+  reviews       ProductReview[]
+  wishlist      WishlistItem[]
+  cart          Cart?
+}
+
+model Address {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String   // e.g. "Home", "Office"
+  fullName      String
+  phone         String
+  addressLine   String
+  city          String
+  state         String
+  postalCode    String
+  country       String   @default("Türkiye")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Brand {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  logoUrl     String?
+  description String?
+  products    Product[]
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  products    Product[]
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  name            String
+  slug            String           @unique
+  description     String
+  price           Float
+  discountPrice   Float?
+  sku             String           @unique
+  images          String[]
+  brandId         String
+  brand           Brand            @relation(fields: [brandId], references: [id])
+  categoryId      String
+  category        Category         @relation(fields: [categoryId], references: [id])
+  
+  // Cosmetics-specific filters
+  skinTypes       String[]         // Oily, Dry, Combination, Sensitive, etc.
+  skinConcerns    String[]         // Acne, Aging, Dark Spots, Hydration, etc.
+  ingredients     String           // Detailed INCI ingredients list
+  badges          String[]         // Vegan, Cruelty-Free, Dermatologically Tested, etc.
+  usageRoutine    String?          // Usage instruction / How to use
+  
+  variants        ProductVariant[]
+  reviews         ProductReview[]
+  wishlistItems   WishlistItem[]
+  stockAlerts     StockNotification[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id              String      @id @default(uuid())
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String      // e.g. "50ml", "100ml" or "Rose Quartz 02"
+  type            String      // VOLUME or SHADE
+  priceAdjustment Float       @default(0.0)
+  stock           Int         @default(0)
+  sku             String      @unique
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id               String         @id @default(uuid())
+  cartId           String
+  cart             Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariantId String
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  quantity         Int            @default(1)
+}
+
+model Order {
+  id                String       @id @default(uuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id])
+  status            OrderStatus  @default(PENDING)
+  totalAmount       Float
+  trackingCode      String?
+  shippingAddressId String
+  billingAddressId  String
+  giftWrap          Boolean      @default(false)
+  giftNote          String?
+  selectedTesterId  String?      // ID of selected sample product
+  items             OrderItem[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model OrderItem {
+  id               String         @id @default(uuid())
+  orderId          String
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariantId String
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+  price            Float
+  quantity         Int
+}
+
+model ProductReview {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating           Int
+  comment          String
+  images           String[]
+  verifiedPurchase Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model StockNotification {
+  id               String          @id @default(uuid())
+  email            String
+  productId        String
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productVariantId String?
+  notified         Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+}
+
+model Coupon {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Float
+  minPurchase   Float        @default(0.0)
+  expiryDate    DateTime
+  active        Boolean      @default(true)
+  usageLimit    Int?
+  usageCount    Int          @default(0)
+  createdAt     DateTime     @default(now())
+}
