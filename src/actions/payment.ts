@@ -1,6 +1,7 @@
 'use server';
 
 import Stripe from 'stripe';
+import { getSessionUser } from './auth';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -15,8 +16,25 @@ export async function createStripeCheckoutSession(data: {
   items: { name: string; price: number; quantity: number }[];
   successUrl: string;
   cancelUrl: string;
+  metadata: {
+    shippingAddressId: string;
+    billingAddressId: string;
+    giftWrap: string;
+    giftNote?: string;
+    selectedTesterId?: string;
+    couponCode?: string;
+    itemsJson: string; // serialized JSON array of { variantId, quantity }[]
+  };
 }) {
   console.log(`[PAYMENT] Creating Stripe Checkout Session for amount: ${data.amount} TL`);
+
+  const user = await getSessionUser();
+  if (!user) {
+    return {
+      success: false,
+      error: 'Ödeme oturumu başlatmak için giriş yapmalısınız.',
+    };
+  }
 
   if (!stripe) {
     console.warn(
@@ -53,6 +71,11 @@ export async function createStripeCheckoutSession(data: {
       mode: 'payment',
       success_url: `${data.successUrl}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: data.cancelUrl,
+      metadata: {
+        ...data.metadata,
+        userId: user.id,
+        userEmail: user.email || '',
+      },
     });
 
     console.log(`[PAYMENT] Stripe Checkout Session created: ${session.id}`);

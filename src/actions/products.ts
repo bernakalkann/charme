@@ -63,15 +63,6 @@ export async function getProducts(options: {
     if (maxPrice !== undefined) where.price.lte = maxPrice;
   }
 
-  // Search filter
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-      { ingredients: { contains: search, mode: 'insensitive' } },
-    ];
-  }
-
   try {
     const products = await prisma.product.findMany({
       where,
@@ -82,11 +73,110 @@ export async function getProducts(options: {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return products;
+
+    if (!search) {
+      return products;
+    }
+
+    // Apply fuzzy search scoring and sorting
+    const scoredProducts = products
+      .map((p) => {
+        const score = getFuzzyScore(
+          search,
+          p.name,
+          p.description,
+          p.brand?.name || '',
+          p.category?.name || ''
+        );
+        return { product: p, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.product);
+
+    return scoredProducts;
   } catch (error) {
     console.error('Error fetching products:', error);
     return [];
   }
+}
+
+// Helper to normalize Turkish characters and clean strings
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u')
+    .trim();
+}
+
+// Calculate similarity score between search query and target fields
+function getFuzzyScore(query: string, productName: string, description: string, brandName: string, categoryName: string): number {
+  const normQuery = normalizeString(query);
+  const normName = normalizeString(productName);
+  const normDesc = normalizeString(description);
+  const normBrand = normalizeString(brandName);
+  const normCat = normalizeString(categoryName);
+
+  let score = 0;
+
+  // 1. Exact string matches
+  if (normName.includes(normQuery)) {
+    score += 100;
+  }
+  if (normBrand.includes(normQuery)) {
+    score += 50;
+  }
+  if (normCat.includes(normQuery)) {
+    score += 30;
+  }
+  if (normDesc.includes(normQuery)) {
+    score += 20;
+  }
+
+  // 2. Token/Word overlaps (Fuzzy word matching)
+  const queryTokens = normQuery.split(/\s+/).filter(Boolean);
+  const nameTokens = normName.split(/\s+/).filter(Boolean);
+
+  let tokenMatchCount = 0;
+  queryTokens.forEach((qToken) => {
+    const exactMatch = nameTokens.some((nToken) => nToken.includes(qToken) || qToken.includes(nToken));
+    if (exactMatch) {
+      tokenMatchCount++;
+    } else {
+      // Check character similarity (Edit distance)
+      nameTokens.forEach((nToken) => {
+        const similarity = getCharacterSimilarity(qToken, nToken);
+        if (similarity > 0.7) {
+          score += similarity * 25;
+        }
+      });
+    }
+  });
+
+  if (queryTokens.length > 0) {
+    score += (tokenMatchCount / queryTokens.length) * 50;
+  }
+
+  return score;
+}
+
+// Simple edit overlap similarity (number of overlapping characters)
+function getCharacterSimilarity(str1: string, str2: string): number {
+  const s1 = str1.length < str2.length ? str1 : str2;
+  const s2 = str1.length < str2.length ? str2 : str1;
+  
+  let matches = 0;
+  for (let i = 0; i < s1.length; i++) {
+    if (s2.includes(s1[i])) {
+      matches++;
+    }
+  }
+  return matches / s2.length;
 }
 
 export async function getProductBySlug(slug: string) {

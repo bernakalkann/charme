@@ -148,6 +148,7 @@ model Order {
   giftWrap          Boolean      @default(false)
   giftNote          String?
   selectedTesterId  String?      // ID of selected sample product
+  stripeSessionId   String?      @unique
   items             OrderItem[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt

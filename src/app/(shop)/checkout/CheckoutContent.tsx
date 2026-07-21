@@ -167,11 +167,25 @@ export default function CheckoutContent({
     const successUrl = `${window.location.origin}/checkout/success?shippingId=${selectedShippingId}&billingId=${selectedBillingId}&giftWrap=${giftWrap}&giftNote=${encodeURIComponent(giftNote || '')}&testerId=${cartStore.selectedTesters[0] || ''}&couponCode=${cartStore.coupon?.code || ''}`;
     const cancelUrl = `${window.location.origin}/checkout`;
 
+    const metadata = {
+      shippingAddressId: selectedShippingId,
+      billingAddressId: selectedBillingId,
+      giftWrap: String(giftWrap),
+      giftNote: giftNote || undefined,
+      selectedTesterId: cartStore.selectedTesters[0] || undefined,
+      couponCode: cartStore.coupon?.code || undefined,
+      itemsJson: JSON.stringify(cartItems.map((item) => ({
+        variantId: item.variantId,
+        quantity: item.quantity,
+      }))),
+    };
+
     const res = await createStripeCheckoutSession({
       amount: total,
       items: stripeItems,
       successUrl,
       cancelUrl,
+      metadata,
     });
 
     if (res.success && res.url) {

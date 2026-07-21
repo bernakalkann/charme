@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { getSessionUser } from './auth';
 import { OrderStatus, DiscountType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
+import { sendShippingUpdateEmail, sendStockNotificationEmail } from '@/lib/email';
 
 async function requireAdmin() {
   const user = await getSessionUser();
@@ -113,13 +116,22 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus, tr
   await requireAdmin();
 
   try {
-    await prisma.order.update({
+    const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
         status,
         trackingCode: trackingCode || undefined,
       },
+      include: {
+        user: true,
+      },
     });
+
+    if (status === 'SHIPPED' && updatedOrder.user?.email) {
+      sendShippingUpdateEmail(updatedOrder.user.email, updatedOrder, updatedOrder.trackingCode || '').catch((err) =>
+        console.error('[SHIPPING EMAIL TRIGGER FAILED]', err)
+      );
+    }
 
     revalidatePath('/admin');
     revalidatePath('/profile');
@@ -252,5 +264,95 @@ export async function toggleCouponActive(couponId: string, active: boolean) {
   } catch (error) {
     console.error('Error toggling coupon status:', error);
     return { success: false, error: 'Kupon durumu güncellenemedi.' };
+  }
+}
+
+export async function uploadProductImage(formData: FormData) {
+  await requireAdmin();
+  const file = formData.get('file') as File;
+  if (!file) {
+    return { success: false, error: 'Dosya yüklenemedi.' };
+  }
+
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Create public/uploads directory if it doesn't exist
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadsDir, { recursive: true });
+
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const originalExtension = path.extname(file.name);
+    const filename = `${uniqueSuffix}${originalExtension}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    // Write file
+    await writeFile(filePath, buffer);
+    const imageUrl = `/uploads/${filename}`;
+
+    return { success: true, url: imageUrl };
+  } catch (error: any) {
+    console.error('File upload error:', error);
+    return { success: false, error: error.message || 'Dosya sunucuya yazılamadı.' };
+  }
+}
+
+export async function updateVariantStock(variantId: string, newStock: number) {
+  await requireAdmin();
+
+  try {
+    // 1. Fetch variant and product details
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: { product: true },
+    });
+
+    if (!variant) {
+      return { success: false, error: 'Ürün varyantı bulunamadı.' };
+    }
+
+    const oldStock = variant.stock;
+
+    // 2. Update stock in database
+    await prisma.productVariant.update({
+      where: { id: variantId },
+      data: { stock: newStock },
+    });
+
+    // 3. If stock went from 0 to > 0, trigger stock notification emails!
+    if (oldStock === 0 && newStock > 0) {
+      const notifications = await prisma.stockNotification.findMany({
+        where: {
+          productId: variant.productId,
+          notified: false,
+        },
+      });
+
+      if (notifications.length > 0) {
+        // Send email to each user asynchronously
+        const productUrl = `http://localhost:3001/product/${variant.product.slug}`;
+        
+        notifications.forEach((n) => {
+          sendStockNotificationEmail(n.email, variant.product.name, productUrl)
+            .then(async () => {
+              // Update notified status
+              await prisma.stockNotification.update({
+                where: { id: n.id },
+                data: { notified: true },
+              });
+            })
+            .catch((err) => console.error('[STOCK NOTIFICATION SEND ERROR]', err));
+        });
+      }
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating variant stock:', error);
+    return { success: false, error: error.message || 'Stok güncellenemedi.' };
   }
 }

@@ -59,6 +59,7 @@ function OrderSuccessPage() {
           giftNote: giftNote ? decodeURIComponent(giftNote) : undefined,
           selectedTesterId: testerId || undefined,
           couponCode: couponCode || undefined,
+          stripeSessionId: sessionId || undefined,
         };
 
         const res = await createOrder(orderData) as any;
@@ -80,7 +81,7 @@ function OrderSuccessPage() {
     }
 
     triggerCreateOrder();
-  }, [cartStore, shippingId, billingId, giftWrap, giftNote, testerId, couponCode]);
+  }, [cartStore, shippingId, billingId, giftWrap, giftNote, testerId, couponCode, sessionId]);
 
   // Estimate delivery (3 business days)
   const deliveryDate = new Date();

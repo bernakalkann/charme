@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getSessionUser } from './auth';
+import { sendOrderConfirmationEmail } from '@/lib/email';
 
 export async function getUserAddresses() {
   const user = await getSessionUser();
@@ -76,21 +77,32 @@ export async function checkCoupon(code: string, subtotal: number) {
   }
 }
 
-export async function createOrder(data: {
-  items: { variantId: string; quantity: number }[];
-  shippingAddressId: string;
-  billingAddressId: string;
-  giftWrap: boolean;
-  giftNote?: string;
-  selectedTesterId?: string;
-  couponCode?: string;
-}) {
-  const user = await getSessionUser();
-  if (!user) return { success: false, error: 'Sipariş oluşturmak için giriş yapmalısınız.' };
-
-  const { items, shippingAddressId, billingAddressId, giftWrap, giftNote, selectedTesterId, couponCode } = data;
+export async function executeOrderCreation(
+  userId: string,
+  data: {
+    items: { variantId: string; quantity: number }[];
+    shippingAddressId: string;
+    billingAddressId: string;
+    giftWrap: boolean;
+    giftNote?: string;
+    selectedTesterId?: string;
+    couponCode?: string;
+    stripeSessionId?: string;
+  }
+) {
+  const { items, shippingAddressId, billingAddressId, giftWrap, giftNote, selectedTesterId, couponCode, stripeSessionId } = data;
 
   try {
+    if (stripeSessionId) {
+      const existing = await prisma.order.findUnique({
+        where: { stripeSessionId },
+      });
+      if (existing) {
+        console.log(`[ORDER] Duplicate prevention triggered. Order already exists for Stripe Session: ${stripeSessionId}`);
+        return { success: true, orderId: existing.id };
+      }
+    }
+
     return await prisma.$transaction(async (tx) => {
       // 1. Calculate actual price and check stock
       let subtotal = 0;
@@ -165,7 +177,7 @@ export async function createOrder(data: {
       // 4. Create Order
       const order = await tx.order.create({
         data: {
-          userId: user.id,
+          userId,
           status: 'PENDING',
           totalAmount,
           shippingAddressId,
@@ -173,6 +185,7 @@ export async function createOrder(data: {
           giftWrap,
           giftNote,
           selectedTesterId,
+          stripeSessionId,
           items: {
             create: orderItemsToCreate,
           },
@@ -181,6 +194,72 @@ export async function createOrder(data: {
 
       return { success: true, orderId: order.id };
     });
+  } catch (error: any) {
+    console.error('Order transaction error:', error);
+    return { success: false, error: error.message || 'Sipariş işlenirken veritabanı hatası oluştu.' };
+  }
+}
+
+export async function createOrder(data: {
+  items: { variantId: string; quantity: number }[];
+  shippingAddressId: string;
+  billingAddressId: string;
+  giftWrap: boolean;
+  giftNote?: string;
+  selectedTesterId?: string;
+  couponCode?: string;
+}) {
+  const user = await getSessionUser();
+  if (!user) return { success: false, error: 'Sipariş oluşturmak için giriş yapmalısınız.' };
+
+  try {
+    const result = await executeOrderCreation(user.id, data);
+
+    if (result.success && result.orderId) {
+      // Async trigger order confirmation email
+      (async () => {
+        try {
+          const fullOrder = await prisma.order.findUnique({
+            where: { id: result.orderId },
+            include: {
+              items: {
+                include: {
+                  productVariant: {
+                    include: { product: true }
+                  }
+                }
+              }
+            }
+          });
+
+          if (fullOrder && user.email) {
+            // Fetch address separately since there is no direct Prisma relation field
+            const shippingAddress = await prisma.address.findUnique({
+              where: { id: fullOrder.shippingAddressId }
+            });
+
+            // Map items for the email template
+            const emailItems = fullOrder.items.map((item) => ({
+              productName: item.productVariant.product.name,
+              variantName: item.productVariant.name,
+              quantity: item.quantity,
+              price: item.price,
+            }));
+
+            await sendOrderConfirmationEmail(user.email, {
+              id: fullOrder.id,
+              totalAmount: fullOrder.totalAmount,
+              shippingAddress,
+              items: emailItems,
+            });
+          }
+        } catch (mailErr) {
+          console.error('[ORDER EMAIL TRIGGER FAILED]', mailErr);
+        }
+      })();
+    }
+
+    return result;
   } catch (error: any) {
     console.error('Order creation error:', error);
     return { success: false, error: error.message || 'Sipariş oluşturulurken bir hata oluştu.' };

@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import * as z from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { sendWelcomeEmail } from '@/lib/email';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'İsim en az 2 karakter olmalıdır.'),
@@ -49,6 +50,11 @@ export async function registerUser(prevState: any, formData: FormData) {
         },
       },
     });
+
+    // Send welcome transactional email asynchronously
+    sendWelcomeEmail(email, name).catch((err) => 
+      console.error('[WELCOME EMAIL TRIGGER FAILED]', err)
+    );
 
     return {
       success: true,

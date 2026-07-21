@@ -7,7 +7,9 @@ import {
   createProduct, 
   deleteProduct, 
   createCoupon, 
-  toggleCouponActive 
+  toggleCouponActive,
+  uploadProductImage,
+  updateVariantStock
 } from '@/actions/admin';
 import { 
   BarChart3, 
@@ -153,6 +155,25 @@ export default function AdminDashboardContent({
       setOrders(orders.map(o => o.id === orderId ? { ...o, status, trackingCode: tracking || o.trackingCode } : o));
     }
     setUpdatingOrderId('');
+  };
+
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await uploadProductImage(formData);
+    if (res.success && res.url) {
+      setNewProd({ ...newProd, images: [res.url] });
+    } else {
+      alert(res.error || 'Resim yüklenemedi.');
+    }
+    setUploadingImage(false);
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -392,24 +413,54 @@ export default function AdminDashboardContent({
                   {products.map((p) => {
                     const totalStock = p.variants.reduce((sum, v) => sum + v.stock, 0);
                     return (
-                      <div key={p.id} className="py-3.5 flex justify-between items-center gap-4">
-                        <div className="min-w-0">
-                          <span className="font-semibold text-primary text-sm truncate block">{p.name}</span>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            SKU: {p.sku} | Marka: {p.brand.name} | Kategori: {p.category.name}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-6 flex-shrink-0">
-                          <div className="text-right">
-                            <span className="font-serif font-semibold text-primary block">{p.price} TL</span>
-                            <span className="text-[10px] text-muted-foreground">Toplam Stok: {totalStock}</span>
+                      <div key={p.id} className="py-3.5 border-b border-border/20 last:border-b-0 space-y-3">
+                        <div className="flex justify-between items-center gap-4">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-primary text-sm truncate block">{p.name}</span>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              SKU: {p.sku} | Marka: {p.brand.name} | Kategori: {p.category.name}
+                            </p>
                           </div>
-                          <button
-                            onClick={() => handleDeleteProduct(p.id)}
-                            className="text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 className="h-4.5 w-4.5" />
-                          </button>
+                          <div className="flex items-center gap-6 flex-shrink-0">
+                            <div className="text-right">
+                              <span className="font-serif font-semibold text-primary block">{p.price} TL</span>
+                              <span className="text-[10px] text-muted-foreground">Toplam Stok: {totalStock}</span>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteProduct(p.id)}
+                              className="text-red-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="h-4.5 w-4.5" />
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Variant list with stock update inputs */}
+                        <div className="pl-4 border-l border-border/60 py-2.5 space-y-2.5 bg-muted/20 rounded-lg p-3 text-[10px]">
+                          <span className="font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Varyant Stok Yönetimi</span>
+                          {p.variants.map((v) => (
+                            <div key={v.id} className="flex items-center justify-between gap-4 py-1">
+                              <span className="font-medium text-primary">{v.name}</span>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  defaultValue={v.stock}
+                                  onBlur={async (e) => {
+                                    const val = Number(e.target.value);
+                                    if (val === v.stock) return;
+                                    const res = await updateVariantStock(v.id, val);
+                                    if (res.success) {
+                                      alert('Stok başarıyla güncellendi!');
+                                    } else {
+                                      alert(res.error || 'Stok güncellenemedi.');
+                                    }
+                                  }}
+                                  className="w-14 bg-background border border-border/50 rounded px-1.5 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-secondary text-[10px]"
+                                />
+                                <span className="text-muted-foreground font-sans">Adet</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
@@ -478,6 +529,32 @@ export default function AdminDashboardContent({
                         onChange={(e) => setNewProd({ ...newProd, sku: e.target.value })}
                         className="w-full text-xs bg-muted border-none rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-secondary"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground uppercase mb-1">Ürün Görseli</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="w-full text-[10px] bg-muted file:bg-primary file:text-primary-foreground file:border-none file:px-3 file:py-1.5 file:rounded file:cursor-pointer file:font-sans file:uppercase file:tracking-wider file:text-[9px] file:font-semibold rounded-md p-2 focus:outline-none"
+                        />
+                        {uploadingImage && <span className="text-[10px] text-muted-foreground animate-pulse">Yükleniyor...</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-muted-foreground uppercase mb-1">Görsel Önizleme</label>
+                      <div className="h-10 w-10 bg-muted rounded border border-border flex items-center justify-center overflow-hidden">
+                        {newProd.images[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={newProd.images[0]} alt="Önizleme" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-[9px] text-muted-foreground">Yok</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
