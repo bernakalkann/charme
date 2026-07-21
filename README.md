@@ -19,6 +19,18 @@ Bu proje; **Next.js 14+ (App Router)**, **PostgreSQL (Docker)**, **Prisma ORM**,
 
 ---
 
+## 📸 Ekran Görüntüleri (Screenshots)
+
+| Ana Sayfa (Homepage) | Ürün Detay (Product Detail) |
+| --- | --- |
+| ![Ana Sayfa](public/screenshots/homepage.png) | ![Ürün Detay](public/screenshots/product.png) |
+
+| Ürün Kataloğu & Filtreler | Güvenli Giriş |
+| --- | --- |
+| ![Katalog](public/screenshots/category.png) | ![Giriş](public/screenshots/login.png) |
+
+---
+
 ## ✨ Temel Özellikler (Features)
 
 1.  **Lüks Arayüz (Premium UI/UX)**: Kozmetik dünyasına özel tasarlanan, tamamen responsive (mobil ve masaüstü uyumlu) tasarım sistemi ve akıcı kullanıcı deneyimi.
